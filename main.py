@@ -1,10 +1,19 @@
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+from typing import Optional
 
 app = FastAPI()
 
 tasks = [{"id": 1, "title": "Buy groceries", "done": False},
          {"id": 2, "title": "Sell groceries", "done": False},
          {"id": 3, "title": "Food", "done": True}]
+
+class TaskCreate(BaseModel):
+    title: Optional[str] = None
+
+class TaskUpdate(BaseModel):
+    title: Optional[str] = None
+    done: Optional[bool] = None
 
 @app.get("/", summary="Describe API endpoints")
 def describe():
@@ -26,43 +35,30 @@ def getById(id: int):
     raise HTTPException(status_code=404, detail=f"Task {id} not found")
 
 @app.post("/tasks", status_code=201, summary="Create a new task")
-async def create_task(request: Request):
-    try:
-        body = await request.json()
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid JSON")
-    
-    title = body.get("title")
-    if not title or not str(title).strip():
+def create_task(task_data: TaskCreate):
+    if not task_data.title or not task_data.title.strip():
         raise HTTPException(
             status_code=400, detail="Title is required and cannot be empty"
         )
 
     new_id = max([t["id"] for t in tasks], default=0) + 1
-    new_task = {"id": new_id, "title": str(title).strip(), "done": False}
+    new_task = {"id": new_id, "title": task_data.title.strip(), "done": False}
     tasks.append(new_task)
     return new_task
 
 @app.put("/tasks/{id}", summary="Update an existing task")
-async def update_task(id: int, request: Request):
-    try:
-        body = await request.json()
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid JSON")
-        
-    if not body:
+def update_task(id: int, task_data: TaskUpdate):
+    if task_data.title is None and task_data.done is None:
         raise HTTPException(status_code=400, detail="Empty body")
         
     for task in tasks:
         if task["id"] == id:
-            if "title" in body:
-                if not body["title"] or not str(body["title"]).strip():
+            if task_data.title is not None:
+                if not task_data.title.strip():
                     raise HTTPException(status_code=400, detail="Title cannot be empty")
-                task["title"] = str(body["title"]).strip()
-            if "done" in body:
-                if not isinstance(body["done"], bool):
-                    raise HTTPException(status_code=400, detail="Done must be a boolean")
-                task["done"] = body["done"]
+                task["title"] = task_data.title.strip()
+            if task_data.done is not None:
+                task["done"] = task_data.done
             return task
             
     raise HTTPException(status_code=404, detail=f"Task {id} not found")
