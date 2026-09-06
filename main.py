@@ -3,7 +3,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from typing import Optional
 
-from database import get_task, initialize_database, list_tasks
+from database import get_task, initialize_database, insert_task, list_tasks
 
 
 app = FastAPI()
@@ -71,17 +71,7 @@ def create_task(task_data: TaskCreate):
             detail="Title is required and cannot be empty"
         )
 
-    new_id = max([t["id"] for t in tasks], default=0) + 1
-
-    new_task = {
-        "id": new_id,
-        "title": task_data.title.strip(),
-        "done": False
-    }
-
-    tasks.append(new_task)
-
-    return new_task
+    return insert_task(task_data.title.strip())
 
 
 @app.put("/tasks/{id}", summary="Update an existing task")
