@@ -1,5 +1,5 @@
 # Task API
-**Status:** ✅ Complete
+**Status:** 🚧 In Progress
 
 A CRUD REST API for a to-do list, built with Python, FastAPI, and SQLite. The HTTP endpoints keep the same behavior as the original in-memory version, while every task is now stored on disk and survives server restarts.
 
