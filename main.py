@@ -3,19 +3,19 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from typing import Optional
 
-from database import get_task, initialize_database, insert_task, list_tasks
+from database import (
+    delete_task as delete_task_record,
+    get_task,
+    initialize_database,
+    insert_task,
+    list_tasks,
+    update_task as update_task_record,
+)
 
 
 app = FastAPI()
 
 initialize_database()
-
-
-tasks = [
-    {"id": 1, "title": "Buy groceries", "done": False},
-    {"id": 2, "title": "Sell groceries", "done": False},
-    {"id": 3, "title": "Food", "done": True}
-]
 
 
 class TaskCreate(BaseModel):
@@ -82,37 +82,21 @@ def update_task(id: int, task_data: TaskUpdate):
             detail="Empty body"
         )
 
-    for task in tasks:
-        if task["id"] == id:
+    task = get_task(id)
+    if task is None:
+        raise HTTPException(status_code=404, detail="Task not found")
 
-            if task_data.title is not None:
-                if not task_data.title.strip():
-                    raise HTTPException(
-                        status_code=400,
-                        detail="Title cannot be empty"
-                    )
+    title = task["title"]
+    if task_data.title is not None:
+        title = task_data.title.strip()
+        if not title:
+            raise HTTPException(status_code=400, detail="Title cannot be empty")
 
-                task["title"] = task_data.title.strip()
-
-            if task_data.done is not None:
-                task["done"] = task_data.done
-
-            return task
-
-    raise HTTPException(
-        status_code=404,
-        detail=f"Task {id} not found"
-    )
+    done = task["done"] if task_data.done is None else task_data.done
+    return update_task_record(id, title, done)
 
 
 @app.delete("/tasks/{id}", status_code=204, summary="Delete a task")
 def delete_task(id: int):
-    for index, task in enumerate(tasks):
-        if task["id"] == id:
-            del tasks[index]
-            return
-
-    raise HTTPException(
-        status_code=404,
-        detail=f"Task {id} not found"
-    )
+    if not delete_task_record(id):
+        raise HTTPException(status_code=404, detail="Task not found")

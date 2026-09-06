@@ -77,3 +77,27 @@ def insert_task(title):
         ).fetchone()
 
     return to_task(row)
+
+
+def update_task(task_id, title, done):
+    with connect() as connection:
+        connection.execute(
+            "UPDATE tasks SET title = ?, done = ? WHERE id = ?",
+            (title, int(done), task_id),
+        )
+        row = connection.execute(
+            "SELECT id, title, done FROM tasks WHERE id = ?",
+            (task_id,),
+        ).fetchone()
+
+    return to_task(row)
+
+
+def delete_task(task_id):
+    with connect() as connection:
+        cursor = connection.execute(
+            "DELETE FROM tasks WHERE id = ?",
+            (task_id,),
+        )
+
+    return cursor.rowcount > 0
