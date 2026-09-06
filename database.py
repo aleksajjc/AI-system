@@ -33,3 +33,33 @@ def initialize_database():
                 "INSERT INTO tasks (title, done) VALUES (?, ?)",
                 SEED_TASKS,
             )
+
+
+def to_task(row):
+    if row is None:
+        return None
+
+    return {
+        "id": row[0],
+        "title": row[1],
+        "done": bool(row[2]),
+    }
+
+
+def list_tasks():
+    with connect() as connection:
+        rows = connection.execute(
+            "SELECT id, title, done FROM tasks ORDER BY id"
+        ).fetchall()
+
+    return [to_task(row) for row in rows]
+
+
+def get_task(task_id):
+    with connect() as connection:
+        row = connection.execute(
+            "SELECT id, title, done FROM tasks WHERE id = ?",
+            (task_id,),
+        ).fetchone()
+
+    return to_task(row)

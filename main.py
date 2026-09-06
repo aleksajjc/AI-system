@@ -1,8 +1,9 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from typing import Optional
 
-from database import initialize_database
+from database import get_task, initialize_database, list_tasks
 
 
 app = FastAPI()
@@ -26,6 +27,14 @@ class TaskUpdate(BaseModel):
     done: Optional[bool] = None
 
 
+@app.exception_handler(HTTPException)
+async def http_exception_handler(_: Request, exc: HTTPException):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"error": str(exc.detail)},
+    )
+
+
 @app.get("/", summary="Describe API endpoints")
 def describe():
     return {
@@ -42,19 +51,16 @@ def check_health():
 
 @app.get("/tasks", summary="List all tasks")
 def getAll():
-    return tasks
+    return list_tasks()
 
 
 @app.get("/tasks/{id}", summary="Get a single task by ID")
 def getById(id: int):
-    for task in tasks:
-        if task["id"] == id:
-            return task
+    task = get_task(id)
+    if task is None:
+        raise HTTPException(status_code=404, detail="Task not found")
 
-    raise HTTPException(
-        status_code=404,
-        detail=f"Task {id} not found"
-    )
+    return task
 
 
 @app.post("/tasks", status_code=201, summary="Create a new task")
