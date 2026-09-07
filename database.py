@@ -76,13 +76,13 @@ def get_task(task_id):
 
 def insert_task(title):
     with connect() as connection:
-        cursor = connection.execute(
-            "INSERT INTO tasks (title, done) VALUES (?, ?)",
-            (title, 0),
-        )
         row = connection.execute(
-            "SELECT id, title, done FROM tasks WHERE id = ?",
-            (cursor.lastrowid,),
+            """
+            INSERT INTO tasks (title, done)
+            VALUES (%s, %s)
+            RETURNING id, title, done
+            """,
+            (title, False),
         ).fetchone()
 
     return to_task(row)
@@ -90,13 +90,14 @@ def insert_task(title):
 
 def update_task(task_id, title, done):
     with connect() as connection:
-        connection.execute(
-            "UPDATE tasks SET title = ?, done = ? WHERE id = ?",
-            (title, int(done), task_id),
-        )
         row = connection.execute(
-            "SELECT id, title, done FROM tasks WHERE id = ?",
-            (task_id,),
+            """
+            UPDATE tasks
+            SET title = %s, done = %s
+            WHERE id = %s
+            RETURNING id, title, done
+            """,
+            (title, done, task_id),
         ).fetchone()
 
     return to_task(row)
@@ -104,9 +105,9 @@ def update_task(task_id, title, done):
 
 def delete_task(task_id):
     with connect() as connection:
-        cursor = connection.execute(
-            "DELETE FROM tasks WHERE id = ?",
+        row = connection.execute(
+            "DELETE FROM tasks WHERE id = %s RETURNING id",
             (task_id,),
-        )
+        ).fetchone()
 
-    return cursor.rowcount > 0
+    return row is not None
