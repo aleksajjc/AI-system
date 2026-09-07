@@ -1,8 +1,16 @@
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, SecretStr
 from typing import Optional
+
+from authentication import (
+    AuthConfigurationError,
+    AuthRejectedError,
+    AuthUnavailableError,
+    sign_in,
+    sign_up,
+)
 
 from database import (
     delete_task as delete_task_record,
@@ -28,6 +36,11 @@ class TaskUpdate(BaseModel):
     done: Optional[bool] = None
 
 
+class AuthCredentials(BaseModel):
+    email: Optional[str] = None
+    password: Optional[SecretStr] = None
+
+
 @app.exception_handler(HTTPException)
 async def http_exception_handler(_: Request, exc: HTTPException):
     return JSONResponse(
@@ -49,13 +62,52 @@ def describe():
     return {
         "name": "Task API",
         "version": "1.0",
-        "endpoints": ["/tasks"]
+        "endpoints": [
+            "/tasks",
+            "/auth/signup",
+            "/auth/login",
+        ],
     }
 
 
 @app.get("/health", summary="Check server health")
 def check_health():
     return {"status": "ok"}
+
+
+def validated_credentials(credentials: AuthCredentials):
+    email = credentials.email.strip() if credentials.email else ""
+    password = credentials.password.get_secret_value() if credentials.password else ""
+    if not email or not password.strip():
+        raise HTTPException(status_code=400, detail="Email and password are required")
+    return email, password
+
+
+def authentication_unavailable():
+    raise HTTPException(status_code=503, detail="Authentication service unavailable")
+
+
+@app.post("/auth/signup", status_code=201, summary="Create a user account")
+def signup(credentials: AuthCredentials):
+    email, password = validated_credentials(credentials)
+    try:
+        user = sign_up(email, password)
+    except AuthRejectedError:
+        raise HTTPException(status_code=400, detail="Unable to create account")
+    except (AuthConfigurationError, AuthUnavailableError):
+        authentication_unavailable()
+    return {"user": user}
+
+
+@app.post("/auth/login", summary="Log in and receive tokens")
+def login(credentials: AuthCredentials):
+    email, password = validated_credentials(credentials)
+    try:
+        return sign_in(email, password)
+    except AuthRejectedError:
+        raise HTTPException(status_code=401, detail="Invalid login credentials")
+    except (AuthConfigurationError, AuthUnavailableError):
+        authentication_unavailable()
 
 
 @app.get("/tasks", summary="List all tasks")

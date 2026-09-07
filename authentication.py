@@ -3,13 +3,23 @@ import json
 import os
 from urllib.parse import urlparse
 
+import httpx
 from dotenv import load_dotenv
 from supabase import Client, ClientOptions, SupabaseException, create_client
+from supabase_auth.errors import AuthApiError
 
 load_dotenv()
 
 
 class AuthConfigurationError(Exception):
+    pass
+
+
+class AuthRejectedError(Exception):
+    pass
+
+
+class AuthUnavailableError(Exception):
     pass
 
 
@@ -65,3 +75,50 @@ def create_supabase_client() -> Client:
         )
     except SupabaseException as exc:
         raise AuthConfigurationError from exc
+
+
+def safe_user(user):
+    created_at = getattr(user, "created_at", None)
+    if hasattr(created_at, "isoformat"):
+        created_at = created_at.isoformat()
+
+    return {
+        "id": str(user.id),
+        "email": user.email,
+        "created_at": created_at,
+    }
+
+
+def sign_up(email: str, password: str):
+    try:
+        response = create_supabase_client().auth.sign_up(
+            {"email": email, "password": password}
+        )
+    except AuthApiError as exc:
+        raise AuthRejectedError from exc
+    except httpx.HTTPError as exc:
+        raise AuthUnavailableError from exc
+
+    if response is None or response.user is None:
+        raise AuthRejectedError
+
+    return safe_user(response.user)
+
+
+def sign_in(email: str, password: str):
+    try:
+        response = create_supabase_client().auth.sign_in_with_password(
+            {"email": email, "password": password}
+        )
+    except AuthApiError as exc:
+        raise AuthRejectedError from exc
+    except httpx.HTTPError as exc:
+        raise AuthUnavailableError from exc
+
+    if response.session is None:
+        raise AuthRejectedError
+
+    return {
+        "access_token": response.session.access_token,
+        "refresh_token": response.session.refresh_token,
+    }
