@@ -136,3 +136,22 @@ def verify_access_token(token: str):
         raise AuthRejectedError
 
     return safe_user(response.user)
+
+
+def sign_out(token: str):
+    url, key = supabase_settings()
+    try:
+        response = httpx.post(
+            f"{url}/auth/v1/logout",
+            params={"scope": "local"},
+            headers={
+                "apikey": key,
+                "Authorization": f"Bearer {token}",
+            },
+            timeout=10.0,
+        )
+        if response.status_code in (400, 401, 403):
+            raise AuthRejectedError
+        response.raise_for_status()
+    except httpx.HTTPError as exc:
+        raise AuthUnavailableError from exc

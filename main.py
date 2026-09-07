@@ -9,6 +9,7 @@ from authentication import (
     AuthRejectedError,
     AuthUnavailableError,
     sign_in,
+    sign_out,
     sign_up,
     verify_access_token,
 )
@@ -67,8 +68,10 @@ def describe():
             "/tasks",
             "/auth/signup",
             "/auth/login",
+            "/auth/logout",
             "/public/info",
             "/protected/profile",
+            "/protected/dashboard",
         ],
     }
 
@@ -90,7 +93,7 @@ def authentication_unavailable():
     raise HTTPException(status_code=503, detail="Authentication service unavailable")
 
 
-def extract_access_token(authorization: Optional[str] = Header(default=None)):
+def require_user(authorization: Optional[str] = Header(default=None)):
     if not authorization:
         raise HTTPException(status_code=401, detail="Access token required")
 
@@ -132,14 +135,32 @@ def login(credentials: AuthCredentials):
         authentication_unavailable()
 
 
+@app.post("/auth/logout", status_code=204, summary="Log out")
+def logout(authenticated=Depends(require_user)):
+    try:
+        sign_out(authenticated["token"])
+    except AuthRejectedError:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    except (AuthConfigurationError, AuthUnavailableError):
+        authentication_unavailable()
+
+
 @app.get("/public/info", summary="Read public information")
 def public_info():
     return {"message": "Welcome stranger! This info is public."}
 
 
 @app.get("/protected/profile", summary="Read the authenticated profile")
-def protected_profile(authenticated=Depends(extract_access_token)):
+def protected_profile(authenticated=Depends(require_user)):
     return authenticated["user"]
+
+
+@app.get("/protected/dashboard", summary="Read the protected dashboard")
+def protected_dashboard(authenticated=Depends(require_user)):
+    return {
+        "message": "Welcome to the protected dashboard",
+        "user_id": authenticated["user"]["id"],
+    }
 
 
 @app.get("/tasks", summary="List all tasks")
