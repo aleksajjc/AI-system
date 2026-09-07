@@ -21,6 +21,8 @@ docker compose up
 
 The API is available at `http://localhost:3000`. Stop the stack with `Ctrl+C`. `docker compose down` removes the containers but keeps the named `taskdata` volume and its rows.
 
+Open the Swagger UI at `http://localhost:3000/docs` to test the API endpoints. 
+
 ## Environment variables
 
 | Variable | Purpose |
