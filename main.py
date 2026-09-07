@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, SecretStr
@@ -66,6 +66,8 @@ def describe():
             "/tasks",
             "/auth/signup",
             "/auth/login",
+            "/public/info",
+            "/protected/profile",
         ],
     }
 
@@ -85,6 +87,17 @@ def validated_credentials(credentials: AuthCredentials):
 
 def authentication_unavailable():
     raise HTTPException(status_code=503, detail="Authentication service unavailable")
+
+
+def extract_access_token(authorization: Optional[str] = Header(default=None)):
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Access token required")
+
+    parts = authorization.split(" ", 1)
+    if len(parts) != 2 or parts[0].lower() != "bearer" or not parts[1].strip():
+        raise HTTPException(status_code=401, detail="Access token required")
+
+    return parts[1].strip()
 
 
 @app.post("/auth/signup", status_code=201, summary="Create a user account")
@@ -108,6 +121,16 @@ def login(credentials: AuthCredentials):
         raise HTTPException(status_code=401, detail="Invalid login credentials")
     except (AuthConfigurationError, AuthUnavailableError):
         authentication_unavailable()
+
+
+@app.get("/public/info", summary="Read public information")
+def public_info():
+    return {"message": "Welcome stranger! This info is public."}
+
+
+@app.get("/protected/profile", summary="Read the authenticated profile")
+def protected_profile(token=Depends(extract_access_token)):
+    return {"message": "Access token received"}
 
 
 @app.get("/tasks", summary="List all tasks")
