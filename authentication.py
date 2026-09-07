@@ -122,3 +122,17 @@ def sign_in(email: str, password: str):
         "access_token": response.session.access_token,
         "refresh_token": response.session.refresh_token,
     }
+
+
+def verify_access_token(token: str):
+    try:
+        response = create_supabase_client().auth.get_user(token)
+    except AuthApiError as exc:
+        raise AuthRejectedError from exc
+    except httpx.HTTPError as exc:
+        raise AuthUnavailableError from exc
+
+    if response is None or response.user is None:
+        raise AuthRejectedError
+
+    return safe_user(response.user)

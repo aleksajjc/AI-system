@@ -10,6 +10,7 @@ from authentication import (
     AuthUnavailableError,
     sign_in,
     sign_up,
+    verify_access_token,
 )
 
 from database import (
@@ -97,7 +98,15 @@ def extract_access_token(authorization: Optional[str] = Header(default=None)):
     if len(parts) != 2 or parts[0].lower() != "bearer" or not parts[1].strip():
         raise HTTPException(status_code=401, detail="Access token required")
 
-    return parts[1].strip()
+    token = parts[1].strip()
+    try:
+        user = verify_access_token(token)
+    except AuthRejectedError:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    except (AuthConfigurationError, AuthUnavailableError):
+        authentication_unavailable()
+
+    return {"token": token, "user": user}
 
 
 @app.post("/auth/signup", status_code=201, summary="Create a user account")
@@ -129,8 +138,8 @@ def public_info():
 
 
 @app.get("/protected/profile", summary="Read the authenticated profile")
-def protected_profile(token=Depends(extract_access_token)):
-    return {"message": "Access token received"}
+def protected_profile(authenticated=Depends(extract_access_token)):
+    return authenticated["user"]
 
 
 @app.get("/tasks", summary="List all tasks")
