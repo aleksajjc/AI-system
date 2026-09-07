@@ -49,9 +49,9 @@ def to_task(row):
         return None
 
     return {
-        "id": row[0],
-        "title": row[1],
-        "done": bool(row[2]),
+        "id": row["id"],
+        "title": row["title"],
+        "done": row["done"],
     }
 
 
@@ -67,7 +67,7 @@ def list_tasks():
 def get_task(task_id):
     with connect() as connection:
         row = connection.execute(
-            "SELECT id, title, done FROM tasks WHERE id = ?",
+            "SELECT id, title, done FROM tasks WHERE id = %s",
             (task_id,),
         ).fetchone()
 
