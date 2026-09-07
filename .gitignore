@@ -12,8 +12,10 @@ __pycache__/
 .env.*
 !.env.example
 
-tasks.db
-tasks.db-shm
-tasks.db-wal
+*.db
+*.db-shm
+*.db-wal
+postgres-data/
+pgdata/
 
 tmp/
