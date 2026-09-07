@@ -5,6 +5,9 @@ services:
       - "127.0.0.1:3000:3000"
     environment:
       DATABASE_URL: ${DATABASE_URL}
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_KEY: ${SUPABASE_KEY}
+      PORT: ${PORT:-3000}
     depends_on:
       db:
         condition: service_healthy
