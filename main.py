@@ -1,6 +1,7 @@
-from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, SecretStr
 from typing import Optional
 
@@ -25,6 +26,7 @@ from database import (
 
 
 app = FastAPI()
+bearer_scheme = HTTPBearer(auto_error=False)
 
 initialize_database()
 
@@ -93,15 +95,17 @@ def authentication_unavailable():
     raise HTTPException(status_code=503, detail="Authentication service unavailable")
 
 
-def require_user(authorization: Optional[str] = Header(default=None)):
-    if not authorization:
+def require_user(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme),
+):
+    if (
+        credentials is None
+        or credentials.scheme.lower() != "bearer"
+        or not credentials.credentials.strip()
+    ):
         raise HTTPException(status_code=401, detail="Access token required")
 
-    parts = authorization.split(" ", 1)
-    if len(parts) != 2 or parts[0].lower() != "bearer" or not parts[1].strip():
-        raise HTTPException(status_code=401, detail="Access token required")
-
-    token = parts[1].strip()
+    token = credentials.credentials.strip()
     try:
         user = verify_access_token(token)
     except AuthRejectedError:
