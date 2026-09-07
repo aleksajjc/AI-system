@@ -1,16 +1,24 @@
-import sqlite3
-from pathlib import Path
+import os
 
-DATABASE_PATH = Path(__file__).with_name("tasks.db")
+import psycopg
+from dotenv import load_dotenv
+from psycopg.rows import dict_row
+
+load_dotenv()
+
+DATABASE_URL = os.getenv("DATABASE_URL")
 SEED_TASKS = (
-    ("Buy groceries", 0),
-    ("Sell groceries", 0),
-    ("Food", 1),
+    ("Buy groceries", False),
+    ("Sell groceries", False),
+    ("Food", True),
 )
 
 
 def connect():
-    return sqlite3.connect(DATABASE_PATH)
+    if not DATABASE_URL:
+        raise RuntimeError("DATABASE_URL is not set")
+
+    return psycopg.connect(DATABASE_URL, row_factory=dict_row)
 
 
 def initialize_database():
@@ -18,21 +26,22 @@ def initialize_database():
         connection.execute(
             """
             CREATE TABLE IF NOT EXISTS tasks (
-                id INTEGER PRIMARY KEY,
+                id SERIAL PRIMARY KEY,
                 title TEXT NOT NULL,
-                done INTEGER NOT NULL DEFAULT 0 CHECK (done IN (0, 1))
+                done BOOLEAN NOT NULL DEFAULT FALSE
             )
             """
         )
         task_count = connection.execute(
-            "SELECT COUNT(*) FROM tasks"
-        ).fetchone()[0]
+            "SELECT COUNT(*) AS task_count FROM tasks"
+        ).fetchone()["task_count"]
 
         if task_count == 0:
-            connection.executemany(
-                "INSERT INTO tasks (title, done) VALUES (?, ?)",
-                SEED_TASKS,
-            )
+            with connection.cursor() as cursor:
+                cursor.executemany(
+                    "INSERT INTO tasks (title, done) VALUES (%s, %s)",
+                    SEED_TASKS,
+                )
 
 
 def to_task(row):
