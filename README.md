@@ -1,26 +1,34 @@
 # Task API
 **Status:** 🚧 In Progress
 
-A CRUD REST API for a to-do list, built with Python, FastAPI, and SQLite. The HTTP endpoints keep the same behavior as the original in-memory version, while every task is now stored on disk and survives server restarts.
+A CRUD REST API for a to-do list, built with Python, FastAPI, PostgreSQL, and Docker Compose. The API and database run in separate containers, while a named Docker volume keeps tasks across stack restarts.
 
-## Why SQLite
+## Run the whole stack
 
-SQLite keeps the entire database in one file, needs no separate database server, and requires no manual setup. It is a good fit for this project because `tasks.db` is created automatically and preserves data between application restarts.
+Docker Desktop or Podman with Docker Compose is required. PostgreSQL does not need to be installed separately.
 
-The database file lives at `tasks.db` in the project root. It is excluded by `.gitignore`, so every clone creates a fresh local database with the three example tasks on its first run.
+Create the local environment file from the committed template:
 
-## Install and run
-
-Python 3.10 or newer is required.
-```bash
-python -m pip install fastapi uvicorn
+```powershell
+Copy-Item .env.example .env
 ```
 
-Start the API with one command:
+Set the values described in `.env.example`, then start the API and PostgreSQL with one command:
 
 ```bash
-python -m uvicorn main:app --reload
+docker compose up
 ```
+
+The API is available at `http://localhost:3000`. Stop the stack with `Ctrl+C`. `docker compose down` removes the containers but keeps the named `taskdata` volume and its rows.
+
+## Environment variables
+
+| Variable | Purpose |
+| --- | --- |
+| `POSTGRES_USER` | Local PostgreSQL user |
+| `POSTGRES_PASSWORD` | Local PostgreSQL password |
+| `POSTGRES_DB` | Database name |
+| `DATABASE_URL` | Connection string used by the API; the host is the Compose service name `db` |
 
 ## Endpoints
 
@@ -34,21 +42,39 @@ python -m uvicorn main:app --reload
 
 Invalid request bodies return `400`, and unknown task IDs return `404`. Errors use the JSON shape `{"error": "message"}`.
 
-## SQLite database
+## Database setup
 
-The application automatically creates the `tasks` table with `id`, `title`, and `done` columns. It seeds three example tasks only when the table is empty, so starting the application repeatedly does not create duplicates.
+The application automatically creates the PostgreSQL `tasks` table with `id`, `title`, and `done` columns. It seeds three example tasks only when the table is empty, so repeated restarts do not create duplicates.
 
-![Tasks table open in DB Browser for SQLite](img.png)
-![SELECT query and results in DB Browser for SQLite](img_1.png)
+PostgreSQL data lives in the Docker named volume `taskdata`, not in the repository. To inspect the table and rows directly:
 
-## SQL exploration
+```bash
+docker compose exec db psql -U postgres -d tasks -c "\dt"
+docker compose exec db psql -U postgres -d tasks -c "SELECT * FROM tasks;"
+```
 
-One query run during Stage 4 was:
+![PostgreSQL tasks table and seeded rows](img_2.png)
+
+## curl example
+
+```text
+$ curl -i http://localhost:3000/tasks
+HTTP/1.1 200 OK
+server: uvicorn
+content-length: 130
+content-type: application/json
+
+[{"id":1,"title":"Buy groceries","done":false},{"id":2,"title":"Sell groceries","done":false},{"id":3,"title":"Food","done":true}]
+```
+
+## SQL verification
+
+One query for checking the seeded Postgres rows is:
 
 ```sql
 SELECT * FROM tasks;
 ```
 
-It returned all three seeded tasks. Changes made directly with SQL were immediately visible through `GET /tasks` because both operations use the same `tasks.db` file.
+It returns the three seeded tasks. Changes made directly in PostgreSQL are visible through `GET /tasks` because the API reads from the same database.
 
 The CRUD storage layer uses parameterized placeholders for every value supplied to `SELECT`, `INSERT`, `UPDATE`, and `DELETE` queries.
